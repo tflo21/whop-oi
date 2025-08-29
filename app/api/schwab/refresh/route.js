@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
@@ -8,14 +8,10 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Refresh token is required' }, { status: 400 });
     }
 
-    console.log('Attempting to refresh access token...');
-    
-    // Create Basic Auth header
     const credentials = Buffer.from(
       `${process.env.SCHWAB_CLIENT_ID}:${process.env.SCHWAB_CLIENT_SECRET}`
     ).toString('base64');
 
-    // Prepare form data for refresh
     const tokenParams = new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: refresh_token,
@@ -32,10 +28,8 @@ export async function POST(request) {
     });
 
     const responseData = await response.json();
-    console.log('Refresh token response status:', response.status);
 
     if (!response.ok) {
-      console.error('Refresh token failed:', responseData);
       return NextResponse.json({
         error: 'Token refresh failed',
         details: responseData
@@ -45,7 +39,6 @@ export async function POST(request) {
     return NextResponse.json(responseData);
 
   } catch (error) {
-    console.error('Token refresh error:', error);
     return NextResponse.json({ 
       error: 'Token refresh failed',
       details: error.message

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   try {
@@ -8,19 +8,15 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Authorization code is required' }, { status: 400 });
     }
 
-    // Create Basic Auth header
     const credentials = Buffer.from(
       `${process.env.SCHWAB_CLIENT_ID}:${process.env.SCHWAB_CLIENT_SECRET}`
     ).toString('base64');
 
-    // Prepare form data
     const tokenParams = new URLSearchParams({
       grant_type: 'authorization_code',
       code: code,
       redirect_uri: process.env.SCHWAB_REDIRECT_URI,
     });
-
-    console.log('Making token request to Schwab...');
 
     const response = await fetch('https://api.schwabapi.com/v1/oauth/token', {
       method: 'POST',
@@ -33,7 +29,6 @@ export async function POST(request) {
     });
 
     const responseData = await response.json();
-    console.log('Schwab response status:', response.status);
 
     if (!response.ok) {
       return NextResponse.json({
@@ -45,7 +40,6 @@ export async function POST(request) {
     return NextResponse.json(responseData);
 
   } catch (error) {
-    console.error('Token exchange error:', error);
     return NextResponse.json({ 
       error: 'Token exchange failed',
       details: error.message

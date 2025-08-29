@@ -1,195 +1,160 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 
-interface OptionsTableProps {
-  symbol: string;
-  accessToken: string | null;
-}
+// Dynamically import components to avoid SSR issues
+const OptionsTable = dynamic(() => import('../components/OptionsTable'), { 
+  ssr: false 
+});
 
-export default function OptionsTable({ symbol, accessToken }: OptionsTableProps) {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+export default function Dashboard() {
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [selectedSymbols, setSelectedSymbols] = useState(['SPY', 'QQQ', 'DIA']);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [tokenStatus, setTokenStatus] = useState('checking');
+  
+  // For now, assume user access is granted
+  const user = { username: 'Demo User' };
 
   useEffect(() => {
-    if (symbol && accessToken) {
-      fetchOptionsData();
-    }
-  }, [symbol, accessToken]);
+    initializeAuth();
+  }, []);
 
-  const fetchOptionsData = async () => {
+  const initializeAuth = async () => {
     try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await fetch(`/api/options/${symbol}`, {
-        method: 'GET',
-        headers: {
-          'access_token': accessToken!,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch data: ${response.status} - ${errorText}`);
+      const token = typeof window !== 'undefined' ? localStorage.getItem('schwab_access_token') : null;
+      if (token) {
+        setAccessToken(token);
+        setIsAuthenticated(true);
+        setTokenStatus('valid');
+      } else {
+        setIsAuthenticated(false);
+        setTokenStatus('invalid');
       }
-      
-      const result = await response.json();
-      setData(result);
-      
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      console.error('Auth initialization failed:', error);
+      setIsAuthenticated(false);
+      setTokenStatus('error');
     }
   };
 
-  const formatOI = (oi: number) => {
-    if (!oi || isNaN(oi)) return '0';
-    if (oi >= 1000) {
-      return (oi / 1000).toFixed(1) + 'k';
+  const handleAuth = () => {
+    window.location.href = '/api/schwab/auth';
+  };
+
+  const handleLogout = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('schwab_access_token');
+      localStorage.removeItem('schwab_refresh_token');
     }
-    return oi.toString();
+    setAccessToken(null);
+    setIsAuthenticated(false);
+    setTokenStatus('invalid');
   };
 
-  const getOIColor = (oi: number) => {
-    if (!oi || isNaN(oi)) return '#9ca3af';
-    if (oi >= 30000) return '#ef4444';
-    if (oi >= 20000) return '#f97316';
-    if (oi >= 10000) return '#eab308';
-    if (oi >= 5000) return '#06b6d4';
-    return '#9ca3af';
-  };
-
-  if (loading) {
+  if (!isAuthenticated) {
     return (
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-white">Loading {symbol}...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 text-center">
-        <p className="text-red-400 font-bold mb-2">Error loading {symbol}</p>
-        <p className="text-gray-400 text-sm mb-4">{error}</p>
-        <button 
-          onClick={fetchOptionsData}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
-        >
-          Retry
-        </button>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 text-center">
-        <p className="text-gray-400">No data available for {symbol}</p>
-      </div>
-    );
-  }
-
-  const totalCallOI = data?.calls?.reduce((sum: number, call: any) => sum + (call.openInterest || 0), 0) || 0;
-  const totalPutOI = data?.puts?.reduce((sum: number, put: any) => sum + (put.openInterest || 0), 0) || 0;
-  const currentPrice = data?.underlying?.price || 0;
-
-  return (
-    <div className="bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
-      {/* Header */}
-      <div className="bg-gray-900 p-6 border-b border-gray-700">
-        <div className="flex justify-between items-start mb-4">
-          <h2 className="text-5xl font-bold text-white font-mono">
-            {symbol}
-          </h2>
-          <div className="text-right">
-            <div className="text-sm text-gray-400">Last</div>
-            <div className="text-2xl font-bold text-white">
-              ${currentPrice.toFixed(2)}
+      <div className="min-h-screen bg-gray-900 text-white">
+        <div className="container mx-auto px-4 py-16">
+          <div className="max-w-md mx-auto text-center">
+            <h1 className="text-4xl font-bold mb-8 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+              Options Dashboard
+            </h1>
+            <p className="text-gray-300 mb-4">
+              Welcome to the professional options dashboard! 
+            </p>
+            <p className="text-gray-300 mb-8">
+              Connect your Charles Schwab account to view high open interest options for SPY, QQQ, and DIA.
+            </p>
+            
+            {tokenStatus === 'checking' && (
+              <div className="mb-6">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                <p className="text-gray-400 text-sm">Checking authentication status...</p>
+              </div>
+            )}
+            
+            <button
+              onClick={handleAuth}
+              disabled={tokenStatus === 'checking'}
+              className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 shadow-lg hover:shadow-xl"
+            >
+              {tokenStatus === 'checking' ? 'Checking...' : 'Connect Charles Schwab'}
+            </button>
+            
+            <div className="mt-8 p-4 bg-yellow-900/20 border border-yellow-500/30 rounded-lg">
+              <p className="text-yellow-300 text-sm">
+                <strong>Features:</strong> Auto-refresh tokens • Real-time data • Professional interface
+              </p>
             </div>
           </div>
         </div>
-        
-        <div className="flex justify-between text-sm">
-          <div>
-            <span className="text-gray-400">Call OI: </span>
-            <span className="text-cyan-400 font-bold">{formatOI(totalCallOI)}</span>
-          </div>
-          <div>
-            <span className="text-gray-400">Put OI: </span>
-            <span className="text-pink-400 font-bold">{formatOI(totalPutOI)}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white">
+      <header className="bg-gray-800 shadow-lg border-b border-gray-700">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                Options Dashboard
+              </h1>
+              <p className="text-sm text-gray-400">Professional Options Trading Interface</p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="text-sm text-gray-400 flex items-center space-x-2">
+                <span>Schwab Connected</span>
+                <div className={`w-2 h-2 rounded-full ${
+                  tokenStatus === 'valid' ? 'bg-green-500' : 
+                  tokenStatus === 'refreshing' ? 'bg-yellow-500' : 
+                  'bg-red-500'
+                }`}></div>
+              </div>
+              
+              <button
+                onClick={handleLogout}
+                className="text-red-400 hover:text-red-300 text-sm font-medium transition-colors"
+              >
+                Disconnect Schwab
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Options Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-700">
-              <th className="px-4 py-3 text-left text-gray-300 font-semibold">C/P</th>
-              <th className="px-4 py-3 text-center text-gray-300 font-semibold">Strike</th>
-              <th className="px-4 py-3 text-right text-gray-300 font-semibold">Price</th>
-              <th className="px-4 py-3 text-right text-gray-300 font-semibold">OI</th>
-              <th className="px-4 py-3 text-center text-gray-300 font-semibold">Expiry</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* Calls */}
-            {data.calls?.map((option: any, index: number) => (
-              <tr key={`call-${index}`} className="border-b border-gray-700 hover:bg-gray-700/50">
-                <td className="px-4 py-3">
-                  <span className="bg-cyan-500 text-black px-2 py-1 rounded text-xs font-bold">
-                    Call
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-center text-white font-mono">
-                  {option.strike}
-                </td>
-                <td className="px-4 py-3 text-right text-white font-mono">
-                  {option.price?.toFixed(2) || 'N/A'}
-                </td>
-                <td className="px-4 py-3 text-right font-bold" style={{ color: getOIColor(option.openInterest) }}>
-                  {formatOI(option.openInterest)}
-                </td>
-                <td className="px-4 py-3 text-center text-gray-300 font-mono">
-                  {option.expiry}
-                </td>
-              </tr>
-            ))}
-            
-            {/* Puts */}
-            {data.puts?.map((option: any, index: number) => (
-              <tr key={`put-${index}`} className="border-b border-gray-700 hover:bg-gray-700/50">
-                <td className="px-4 py-3">
-                  <span className="bg-pink-500 text-white px-2 py-1 rounded text-xs font-bold">
-                    Put
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-center text-white font-mono">
-                  {option.strike}
-                </td>
-                <td className="px-4 py-3 text-right text-white font-mono">
-                  {option.price?.toFixed(2) || 'N/A'}
-                </td>
-                <td className="px-4 py-3 text-right font-bold" style={{ color: getOIColor(option.openInterest) }}>
-                  {formatOI(option.openInterest)}
-                </td>
-                <td className="px-4 py-3 text-center text-gray-300 font-mono">
-                  {option.expiry}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <main className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold text-gray-300 mb-4">
+            High Open Interest Options
+          </h2>
+          <p className="text-gray-400 text-sm">
+            Real-time data • Strikes ±$20 from current price • Next 3 weeks • Top 8 by OI
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          {selectedSymbols.map((symbol) => (
+            <OptionsTable
+              key={symbol}
+              symbol={symbol}
+              accessToken={accessToken}
+            />
+          ))}
+        </div>
+
+        <div className="mt-8 text-center">
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-gray-700 hover:bg-gray-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+          >
+            Refresh Data
+          </button>
+        </div>
+      </main>
     </div>
   );
 }
